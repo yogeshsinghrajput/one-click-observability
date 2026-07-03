@@ -42,7 +42,7 @@ resource "aws_launch_template" "this" {
   }
 
 
-  
+
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh.tftpl", {
     efs_id             = var.efs_file_system_id
