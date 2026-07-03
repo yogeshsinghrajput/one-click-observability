@@ -74,8 +74,12 @@ pipeline {
                     usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     dir('terraform-bootstrap') {
-                        sh 'terraform init'
-                        sh 'terraform apply -auto-approve'
+                        sh '''
+                            terraform init
+                            terraform state show aws_s3_bucket.terraform_backend >/dev/null 2>&1 || terraform import aws_s3_bucket.terraform_backend buildmasters-tfstate-prod || true
+                            terraform state show aws_dynamodb_table.terraform_lock >/dev/null 2>&1 || terraform import aws_dynamodb_table.terraform_lock monitoring-stack-dev-lock || true
+                            terraform apply -auto-approve
+                        '''
                     }
                 }
             }
