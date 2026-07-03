@@ -108,9 +108,8 @@ pipeline {
                         "EFS_ID=${params.EFS_ID.trim()}"
                     ]) {
                         withCredentials([
-                            file(credentialsId: 'aws-ssh-key-id', variable: 'SSH_KEY_FILE'),
-                            string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
-                            string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
+                            sshUserPrivateKey(credentialsId: '0e6e730a-e3e3-4faf-af9c-8b74efac6efc', keyFileVariable: 'SSH_KEY_FILE'),
+                            usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                         ]) {
                             sh '''
                             ansible-playbook -i inventory/aws_ec2.yml site.yml \
@@ -182,9 +181,13 @@ Jenkins Observability Pipeline
 
 void sendNotification(Map args) {
     if (args.email && args.email.trim() != "") {
-        mail to: args.email.trim(),
-             subject: args.subject,
-             body: args.body
+        try {
+            mail to: args.email.trim(),
+                 subject: args.subject,
+                 body: args.body
+        } catch (Exception e) {
+            echo "WARNING: Failed to send email notification via SMTP: ${e.getMessage()}"
+        }
     } else {
         echo "Notification skipped: email parameter is empty"
     }

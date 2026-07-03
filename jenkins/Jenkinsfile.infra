@@ -70,8 +70,7 @@ pipeline {
             when { expression { params.ACTION == 'apply' } }
             steps {
                 withCredentials([
-                    string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
+                    usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     dir('terraform-bootstrap') {
                         sh 'terraform init'
@@ -85,8 +84,7 @@ pipeline {
             when { expression { params.ACTION == 'apply' } }
             steps {
                 withCredentials([
-                    string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
+                    usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     dir(env.TF_DIR) {
                         sh 'terraform init'
@@ -101,8 +99,7 @@ pipeline {
             when { expression { params.ACTION == 'apply' } }
             steps {
                 withCredentials([
-                    string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
+                    usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     script {
                         dir(env.TF_DIR) {
@@ -127,8 +124,7 @@ pipeline {
             when { expression { params.ACTION == 'destroy' } }
             steps {
                 withCredentials([
-                    string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
+                    usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     sh 'bash destroy.sh'
                 }
@@ -188,9 +184,13 @@ Jenkins Observability Pipeline
 
 void sendNotification(Map args) {
     if (args.email && args.email.trim() != "") {
-        mail to: args.email.trim(),
-             subject: args.subject,
-             body: args.body
+        try {
+            mail to: args.email.trim(),
+                 subject: args.subject,
+                 body: args.body
+        } catch (Exception e) {
+            echo "WARNING: Failed to send email notification via SMTP: ${e.getMessage()}"
+        }
     } else {
         echo "Notification skipped: email parameter is empty"
     }
