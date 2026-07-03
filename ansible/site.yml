@@ -1,0 +1,68 @@
+- name: Wait for instances to boot and python to become available
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH to be responsive
+      raw: echo ready
+      register: ssh_check
+      until: ssh_check.rc == 0
+      retries: 30
+      delay: 10
+
+    - name: Wait for Python interpreter to be installed and available
+      raw: test -f /usr/bin/python3.8
+      register: python_check
+      until: python_check.rc == 0
+      retries: 30
+      delay: 10
+
+- name: Common setup for bastion hosts
+  hosts: bastion
+  become: true
+  gather_facts: true
+  roles:
+    - common
+    - security
+
+- name: Common setup for monitoring nodes
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+    - common
+    - security
+
+- name: Ensure Node Exporter on monitoring nodes
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+    - node_exporter
+
+- name: Configure Prometheus on monitoring nodes
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+    - prometheus
+
+- name: Configure Alertmanager on monitoring nodes
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+    - alertmanager
+
+- name: Configure EFS mounts for Grafana
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+    - efs
+
+- name: Configure Grafana servers
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+    - grafana

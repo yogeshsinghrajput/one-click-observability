@@ -1,0 +1,191 @@
+@Library('my-shared-library') _
+
+pipeline {
+    agent any
+
+    options {
+        timeout(time: 2, unit: 'HOURS')
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '5', artifactNumToKeepStr: '5'))
+    }
+
+    parameters {
+        string(name: 'BASTION_IP', defaultValue: '', description: 'Public IP of the bastion host')
+        string(name: 'EFS_ID', defaultValue: '', description: 'EFS File System ID')
+        choice(name: 'ENVIRONMENT', choices: ['dev'], description: 'Target environment')
+        string(name: 'NOTIFICATION_EMAIL', defaultValue: 'yogeshsinghrajput54@gmail.com', description: 'Email address for status notifications (leave blank to disable)')
+        string(name: 'ALB_DNS_NAME', defaultValue: '', description: 'DNS name of the Application Load Balancer')
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+        ANSIBLE_DIR        = 'ansible'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkoutSCM()
+            }
+        }
+
+        stage('Diagnostics') {
+            steps {
+                echo "=== Diagnostics & Tool Version Info ==="
+                sh 'ansible --version'
+                sh 'python3 --version'
+                dir(env.ANSIBLE_DIR) {
+                    sh 'ansible-galaxy collection list'
+                }
+            }
+        }
+
+        stage('Validate') {
+            steps {
+                script {
+                    echo "Validating input parameters..."
+                    if (!params.BASTION_IP || params.BASTION_IP.trim() == "") {
+                        error "Validation Failed: BASTION_IP parameter is required."
+                    }
+                    if (!params.EFS_ID || params.EFS_ID.trim() == "") {
+                        error "Validation Failed: EFS_ID parameter is required."
+                    }
+                    
+                    // Validate IP address format
+                    def ipPattern = ~/^([0-9]{1,3}\.){3}[0-9]{1,3}$/
+                    if (!(params.BASTION_IP.trim() =~ ipPattern)) {
+                        error "Validation Failed: BASTION_IP '${params.BASTION_IP}' is not a valid IPv4 address."
+                    }
+
+                    // Validate EFS ID format (fs-xxxxxxx or fs-xxxxxxxxxxxxxxxxx)
+                    def efsPattern = ~/^fs-[0-9a-fA-F]+$/
+                    if (!(params.EFS_ID.trim() =~ efsPattern)) {
+                        error "Validation Failed: EFS_ID '${params.EFS_ID}' is not a valid EFS File System ID format (e.g. fs-04b01c21bb1822374)."
+                    }
+
+                    if (params.NOTIFICATION_EMAIL && params.NOTIFICATION_EMAIL.trim() != "") {
+                        def emailPattern = ~/^([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})$/
+                        if (!(params.NOTIFICATION_EMAIL.trim() =~ emailPattern)) {
+                            error "Validation Failed: NOTIFICATION_EMAIL '${params.NOTIFICATION_EMAIL}' is not a valid format."
+                        }
+                    }
+                    echo "All parameters successfully validated."
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                dir(env.ANSIBLE_DIR) {
+                    echo "Installing Python and Ansible core requirements..."
+                    sh 'pip install --user boto3 botocore ansible-core==2.16.8 --break-system-packages'
+                }
+            }
+        }
+
+        stage('Install Collections') {
+            steps {
+                dir(env.ANSIBLE_DIR) {
+                    echo "Installing required Ansible Galaxy collections via requirements.yml..."
+                    sh 'ansible-galaxy collection install -r requirements.yml'
+                }
+            }
+        }
+
+        stage('Syntax Check') {
+            steps {
+                dir(env.ANSIBLE_DIR) {
+                    echo "Verifying playbook syntax..."
+                    sh 'ansible-playbook --syntax-check site.yml'
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                dir(env.ANSIBLE_DIR) {
+                    echo "Deploying monitoring configuration stack..."
+                    withEnv([
+                        "BASTION_IP=${params.BASTION_IP.trim()}",
+                        "EFS_ID=${params.EFS_ID.trim()}"
+                    ]) {
+                        withCredentials([
+                            file(credentialsId: 'aws-ssh-key-id', variable: 'SSH_KEY_FILE'),
+                            string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
+                            string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
+                        ]) {
+                            sh '''
+                            ansible-playbook -i inventory/aws_ec2.yml site.yml \
+                                -e "bastion_ip=${BASTION_IP}" \
+                                -e "grafana_efs_file_system_id=${EFS_ID}" \
+                                -e "ansible_ssh_private_key_file=${SSH_KEY_FILE}"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            script {
+                def grafanaUrl = params.ALB_DNS_NAME ? "http://${params.ALB_DNS_NAME}" : "http://<alb-dns-name>"
+                sendNotification(
+                    status: 'SUCCESS',
+                    email: params.NOTIFICATION_EMAIL,
+                    subject: "SUCCESS: Deploy Observability Stack [Build #${env.BUILD_NUMBER}]",
+                    body: """Dear Team,
+
+We are pleased to inform you that the monitoring and observability stack has been successfully deployed and configured.
+
+Deployment Details:
+-------------------
+- Environment: ${params.ENVIRONMENT.toUpperCase()}
+- Bastion Host IP: ${params.BASTION_IP}
+- EFS File System ID: ${params.EFS_ID}
+- Grafana Portal: ${grafanaUrl}
+- Jenkins Job: ${env.JOB_NAME}
+- Build Number: #${env.BUILD_NUMBER}
+
+You can access the Grafana portal directly using the link above. Use the configured credentials to log in.
+
+To view the detailed Jenkins execution logs, please visit:
+${env.BUILD_URL}
+
+Best Regards,
+Jenkins Observability Pipeline
+"""
+                )
+            }
+        }
+        failure {
+            sendNotification(
+                status: 'FAILURE',
+                email: params.NOTIFICATION_EMAIL,
+                subject: "FAILURE: Deploy Observability Stack [Build #${env.BUILD_NUMBER}]",
+                body: """Dear Team,
+
+We regret to inform you that the monitoring and observability stack deployment has failed during the Ansible host configuration stage.
+
+Failure Details:
+----------------
+- Environment: ${params.ENVIRONMENT.toUpperCase()}
+- Bastion Host IP: ${params.BASTION_IP}
+- EFS File System ID: ${params.EFS_ID}
+- Jenkins Job: ${env.JOB_NAME}
+- Build Number: #${env.BUILD_NUMBER}
+
+Please review the build execution logs to diagnose and resolve the issue:
+${env.BUILD_URL}
+
+Best Regards,
+Jenkins Observability Pipeline
+"""
+            )
+        }
+    }
+}
