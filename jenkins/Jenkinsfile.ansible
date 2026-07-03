@@ -1,5 +1,3 @@
-@Library('my-shared-library') _
-
 pipeline {
     agent any
 
@@ -25,7 +23,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkoutSCM()
+                checkout scm
             }
         }
 
@@ -171,14 +169,6 @@ Jenkins Observability Pipeline
 
 We regret to inform you that the monitoring and observability stack deployment has failed during the Ansible host configuration stage.
 
-Failure Details:
-----------------
-- Environment: ${params.ENVIRONMENT.toUpperCase()}
-- Bastion Host IP: ${params.BASTION_IP}
-- EFS File System ID: ${params.EFS_ID}
-- Jenkins Job: ${env.JOB_NAME}
-- Build Number: #${env.BUILD_NUMBER}
-
 Please review the build execution logs to diagnose and resolve the issue:
 ${env.BUILD_URL}
 
@@ -187,5 +177,15 @@ Jenkins Observability Pipeline
 """
             )
         }
+    }
+}
+
+void sendNotification(Map args) {
+    if (args.email && args.email.trim() != "") {
+        mail to: args.email.trim(),
+             subject: args.subject,
+             body: args.body
+    } else {
+        echo "Notification skipped: email parameter is empty"
     }
 }

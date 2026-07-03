@@ -1,5 +1,3 @@
-@Library('my-shared-library') _
-
 pipeline {
     agent any
 
@@ -23,7 +21,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkoutSCM()
+                checkout scm
             }
         }
 
@@ -75,7 +73,10 @@ pipeline {
                     string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
-                    bootstrapBackend()
+                    dir('terraform-bootstrap') {
+                        sh 'terraform init'
+                        sh 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
@@ -87,11 +88,11 @@ pipeline {
                     string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
-                    runTerraform(
-                        action: params.ACTION,
-                        environment: params.ENVIRONMENT,
-                        directory: env.TF_DIR
-                    )
+                    dir(env.TF_DIR) {
+                        sh 'terraform init'
+                        sh "terraform plan -var-file=terraform.tfvars -var='environment=${params.ENVIRONMENT}' -out=tfplan"
+                        sh 'terraform apply -auto-approve tfplan'
+                    }
                 }
             }
         }
@@ -103,10 +104,21 @@ pipeline {
                     string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
-                    triggerDownstreamConfig(
-                        environment: params.ENVIRONMENT,
-                        notificationEmail: params.NOTIFICATION_EMAIL
-                    )
+                    script {
+                        dir(env.TF_DIR) {
+                            def bastionIp = sh(script: "terraform output -raw bastion_public_ip", returnStdout: true).trim()
+                            def efsId = sh(script: "terraform output -raw efs_id", returnStdout: true).trim()
+                            def albDnsName = sh(script: "terraform output -raw alb_dns_name", returnStdout: true).trim()
+                            
+                            build job: 'Service-Configuration', parameters: [
+                                string(name: 'BASTION_IP', value: bastionIp),
+                                string(name: 'EFS_ID', value: efsId),
+                                string(name: 'ENVIRONMENT', value: params.ENVIRONMENT),
+                                string(name: 'NOTIFICATION_EMAIL', value: params.NOTIFICATION_EMAIL),
+                                string(name: 'ALB_DNS_NAME', value: albDnsName)
+                            ], wait: false
+                        }
+                    }
                 }
             }
         }
@@ -118,7 +130,7 @@ pipeline {
                     string(credentialsId: 'aws-credentials-id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-credentials-id', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
-                    teardownInfra()
+                    sh 'bash destroy.sh'
                 }
             }
         }
@@ -163,13 +175,6 @@ Jenkins Observability Pipeline
 
 We regret to inform you that the monitoring and observability infrastructure provisioning has failed.
 
-Provisioning Details:
----------------------
-- Action: ${params.ACTION.toUpperCase()}
-- Environment: ${params.ENVIRONMENT.toUpperCase()}
-- Jenkins Job: ${env.JOB_NAME}
-- Build Number: #${env.BUILD_NUMBER}
-
 Please review the build execution logs to diagnose and resolve the issue:
 ${env.BUILD_URL}
 
@@ -178,5 +183,15 @@ Jenkins Observability Pipeline
 """
             )
         }
+    }
+}
+
+void sendNotification(Map args) {
+    if (args.email && args.email.trim() != "") {
+        mail to: args.email.trim(),
+             subject: args.subject,
+             body: args.body
+    } else {
+        echo "Notification skipped: email parameter is empty"
     }
 }
