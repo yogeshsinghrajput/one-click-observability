@@ -16,8 +16,9 @@ pipeline {
     }
 
     environment {
-        AWS_DEFAULT_REGION = 'us-east-1'
-        ANSIBLE_DIR        = 'ansible'
+        AWS_DEFAULT_REGION  = 'us-east-1'
+        ANSIBLE_DIR         = 'ansible'
+        TF_PLUGIN_CACHE_DIR = '/tmp/terraform-plugin-cache'
     }
 
     stages {

@@ -14,8 +14,9 @@ pipeline {
     }
 
     environment {
-        AWS_DEFAULT_REGION = 'us-east-1'
-        TF_DIR             = 'terraform'
+        AWS_DEFAULT_REGION  = 'us-east-1'
+        TF_DIR              = 'terraform'
+        TF_PLUGIN_CACHE_DIR = '/tmp/terraform-plugin-cache'
     }
 
     stages {
