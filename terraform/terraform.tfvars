@@ -1,6 +1,6 @@
 environment             = "dev"
 aws_region              = "us-east-1"
-key_name                = "assignment-6"
+key_name                = "prometheus-grafana"
 allowed_ssh_cidr        = "0.0.0.0/0"
 instance_type           = "t3.micro"
 prometheus_port         = 9090

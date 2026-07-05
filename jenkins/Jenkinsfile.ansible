@@ -119,13 +119,13 @@ pipeline {
                             usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                         ]) {
                             sh '''
-                                cp "${SSH_KEY_FILE}" /tmp/fixed_key.pem
-                                echo "" >> /tmp/fixed_key.pem
-                                chmod 600 /tmp/fixed_key.pem
+                                cp "${SSH_KEY_FILE}" fixed_key.pem
+                                echo "" >> fixed_key.pem
+                                chmod 600 fixed_key.pem
                                 ansible-playbook -i inventory/aws_ec2.yml site.yml \
                                     -e "bastion_ip=${BASTION_IP}" \
                                     -e "grafana_efs_file_system_id=${EFS_ID}" \
-                                    -e "ansible_ssh_private_key_file=/tmp/fixed_key.pem"
+                                    -e "ansible_ssh_private_key_file=fixed_key.pem"
                             '''
                         }
                     }
