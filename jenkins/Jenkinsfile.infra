@@ -125,7 +125,7 @@ pipeline {
             }
         }
 
-        stage('Teardown') {
+        stage('Infrastructure Cleanup') {
             when { expression { params.ACTION == 'destroy' } }
             steps {
                 withCredentials([
