@@ -188,8 +188,9 @@ module "cloudwatch" {
 }
 
 resource "aws_ssm_parameter" "monitoring_env" {
-  name  = "/${var.environment}/monitoring/project"
-  type  = "String"
-  value = "Monitoring Stack"
-  tags  = local.common_tags
+  name      = "/${var.environment}/monitoring/project"
+  type      = "String"
+  value     = "Monitoring Stack"
+  overwrite = true
+  tags      = local.common_tags
 }

@@ -1,7 +1,7 @@
 [paths]
 data = {{ grafana_efs_mount_point }}
 logs = /var/log/grafana
-plugins = /var/lib/grafana/plugins
+plugins = {{ grafana_efs_mount_point }}/plugins
 provisioning = /etc/grafana/provisioning
 
 [server]

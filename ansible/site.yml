@@ -10,7 +10,7 @@
       delay: 10
 
     - name: Wait for Python interpreter to be installed and available
-      raw: test -f /usr/bin/python3.8
+      raw: which python3 || which python
       register: python_check
       until: python_check.rc == 0
       retries: 30

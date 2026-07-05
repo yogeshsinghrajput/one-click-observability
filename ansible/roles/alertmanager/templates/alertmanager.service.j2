@@ -8,6 +8,8 @@ User={{ alertmanager_user }}
 Group={{ alertmanager_group }}
 Type=simple
 ExecStart={{ alertmanager_current_dir }}/alertmanager --config.file={{ alertmanager_config_dir }}/alertmanager.yml --storage.path={{ alertmanager_data_dir }}
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

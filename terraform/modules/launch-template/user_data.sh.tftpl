@@ -1,27 +1,32 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
+echo "[user-data] Starting instance bootstrap at $(date)"
+
+# Update packages
 yum update -y
-amazon-linux-extras install -y nginx1
-systemctl enable nginx
-systemctl start nginx
 
-# Enable and install python38 to support Ansible execution
-amazon-linux-extras enable python3.8
-yum install -y python38
+# Install Python 3 (required by Ansible for host configuration)
+# Amazon Linux 2: python3 is available directly
+yum install -y python3 python3-pip
 
-# Format and mount the extra EBS volume for Prometheus TSDB persistence.
+# Install amazon-efs-utils for EFS TLS mounts
+yum install -y amazon-efs-utils || true
+
+# Format and mount the extra EBS volume for Prometheus TSDB persistence
 if [ -b /dev/xvdb ]; then
-  if ! blkid /dev/xvdb; then
+  if ! blkid /dev/xvdb > /dev/null 2>&1; then
+    echo "[user-data] Formatting /dev/xvdb as ext4"
     mkfs -t ext4 /dev/xvdb
   fi
   mkdir -p /prometheus-data
-  mount -o defaults /dev/xvdb /prometheus-data
-  echo '/dev/xvdb /prometheus-data ext4 defaults,nofail 0 2' >> /etc/fstab
+  mount -o defaults,nofail /dev/xvdb /prometheus-data
+  # Persist mount across reboots
+  grep -q '/dev/xvdb' /etc/fstab || echo '/dev/xvdb /prometheus-data ext4 defaults,nofail 0 2' >> /etc/fstab
+  echo "[user-data] /dev/xvdb mounted at /prometheus-data"
 fi
 
-# Placeholder for Grafana, Prometheus, Alertmanager, and Node Exporter installation
-# In a full assignment implementation, install Docker/Ansible or custom systemd units here.
-
-echo "Grafana port ${grafana_port}" > /tmp/monitoring_setup.log
-echo "Node exporter port ${node_exporter_port}" >> /tmp/monitoring_setup.log
+echo "[user-data] Bootstrap complete at $(date)"
+echo "Grafana port: ${grafana_port}" >> /tmp/monitoring_setup.log
+echo "Node exporter port: ${node_exporter_port}" >> /tmp/monitoring_setup.log

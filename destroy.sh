@@ -19,7 +19,9 @@ echo -e "\n--> Step 1: Destroying main infrastructure stack..."
 if [ -d "$MAIN_TERRAFORM_DIR" ]; then
     cd "$MAIN_TERRAFORM_DIR"
     echo "Initializing Terraform..."
-    terraform init || echo "Failed to initialize main stack. Proceeding..."
+    export TF_PLUGIN_CACHE_DIR=/tmp/terraform-plugin-cache
+    mkdir -p /tmp/terraform-plugin-cache
+    terraform init -reconfigure || echo "Failed to initialize main stack. Proceeding..."
     echo "Running terraform destroy..."
     terraform destroy -auto-approve -var environment=dev || echo "Terraform destroy failed or main stack not found. Proceeding..."
 else
@@ -46,7 +48,9 @@ echo -e "\n--> Step 3: Performing bootstrap Terraform destroy..."
 if [ -d "$BOOTSTRAP_DIR" ]; then
     cd "$BOOTSTRAP_DIR"
     echo "Initializing Bootstrap Terraform..."
-    terraform init || echo "Failed to initialize bootstrap. Proceeding..."
+    export TF_PLUGIN_CACHE_DIR=/tmp/terraform-plugin-cache
+    mkdir -p /tmp/terraform-plugin-cache
+    terraform init -reconfigure || echo "Failed to initialize bootstrap. Proceeding..."
     # Run destroy (may not delete the versioned S3 bucket if not empty)
     terraform destroy -auto-approve || true
 else

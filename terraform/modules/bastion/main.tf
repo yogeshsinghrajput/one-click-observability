@@ -9,8 +9,11 @@ resource "aws_instance" "bastion" {
 
   user_data = <<-EOF
               #!/bin/bash
-              amazon-linux-extras enable python3.8
-              yum install -y python38
+              set -euo pipefail
+              exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
+              yum update -y
+              yum install -y python3 python3-pip
+              echo "Bastion bootstrap complete at $(date)"
               EOF
 
   tags = merge(var.tags, {

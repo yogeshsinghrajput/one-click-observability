@@ -26,6 +26,7 @@ prometheus_group: prometheus
 
 node_exporter_version: 1.8.2
 node_exporter_port: 9100
+node_exporter_archive: "node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
 node_exporter_install_dir: /opt/node_exporter-{{ node_exporter_version }}
 node_exporter_current_dir: /opt/node_exporter
 node_exporter_user: node_exporter
@@ -38,10 +39,15 @@ log_level: info
 grafana_static_targets: []
 node_exporter_static_targets: []
 
+alertmanager_version: 0.27.0
+alertmanager_port: 9093
+# Set this to your real webhook URL (Slack, PagerDuty, etc.)
+alertmanager_webhook_url: ""
+
 enable_firewall: false
 
 ansible_user: ec2-user
 ansible_ssh_private_key_file: ~/.ssh/assignment-6.pem
-ansible_python_interpreter: /usr/bin/python3.8
+ansible_python_interpreter: auto_silent
 bastion_ip: ""
 

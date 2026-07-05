@@ -1,9 +1,8 @@
 ---
-- name: Ensure Grafana EFS file system ID is provided
-  ansible.builtin.assert:
-    that:
-      - grafana_efs_file_system_id | length > 0
-    fail_msg: "Set grafana_efs_file_system_id to the Terraform output efs_id before running Grafana tasks."
+- name: Warn if Grafana EFS file system ID is not provided
+  ansible.builtin.debug:
+    msg: "WARNING: grafana_efs_file_system_id is not set — Grafana data will use local disk only (no EFS persistence)."
+  when: grafana_efs_file_system_id | default('') | length == 0
 
 - name: Configure Grafana repository on RedHat family hosts
   ansible.builtin.yum_repository:
