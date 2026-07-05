@@ -78,10 +78,7 @@ pipeline {
                 dir(env.ANSIBLE_DIR) {
                     echo "Setting up isolated Python virtualenv and installing dependencies..."
                     sh '''
-                        python3 -m venv venv
-                        . venv/bin/activate
-                        pip install --upgrade pip
-                        pip install boto3 botocore ansible-core==2.16.8
+                        pip3 install --user --break-system-packages boto3 botocore
                     '''
                 }
             }
@@ -92,7 +89,6 @@ pipeline {
                 dir(env.ANSIBLE_DIR) {
                     echo "Installing required Ansible Galaxy collections via requirements.yml..."
                     sh '''
-                        . venv/bin/activate
                         ansible-galaxy collection install -r requirements.yml
                     '''
                 }
@@ -104,7 +100,6 @@ pipeline {
                 dir(env.ANSIBLE_DIR) {
                     echo "Verifying playbook syntax (collections must be installed first)..."
                     sh '''
-                        . venv/bin/activate
                         ansible-playbook --syntax-check site.yml
                     '''
                 }
@@ -124,7 +119,6 @@ pipeline {
                             usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                         ]) {
                             sh '''
-                                . venv/bin/activate
                                 ansible-playbook -i inventory/aws_ec2.yml site.yml \
                                     -e "bastion_ip=${BASTION_IP}" \
                                     -e "grafana_efs_file_system_id=${EFS_ID}" \
