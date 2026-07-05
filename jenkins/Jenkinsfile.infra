@@ -16,7 +16,9 @@ pipeline {
     environment {
         AWS_DEFAULT_REGION  = 'us-east-1'
         TF_DIR              = 'terraform'
-        TF_PLUGIN_CACHE_DIR = '/tmp/terraform-plugin-cache'
+        TF_PLUGIN_CACHE_DIR = '/var/lib/jenkins/.terraform.d/plugin-cache'
+        // Force Terraform (Go binary) to prefer IPv4 to avoid IPv6 CDN connection resets
+        GODEBUG             = 'preferIPv4=1'
     }
 
     stages {
@@ -55,13 +57,17 @@ pipeline {
                 echo "Running CI checks for main Terraform configuration..."
                 dir(env.TF_DIR) {
                     sh 'terraform fmt -check'
-                    sh 'terraform init -backend=false'
+                    retry(3) {
+                        sh 'terraform init -backend=false'
+                    }
                     sh 'terraform validate'
                 }
                 echo "Running CI checks for Terraform bootstrap configuration..."
                 dir('terraform-bootstrap') {
                     sh 'terraform fmt -check'
-                    sh 'terraform init -backend=false'
+                    retry(3) {
+                        sh 'terraform init -backend=false'
+                    }
                     sh 'terraform validate'
                 }
             }
@@ -74,8 +80,10 @@ pipeline {
                     usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     dir('terraform-bootstrap') {
+                        retry(3) {
+                            sh 'terraform init'
+                        }
                         sh '''
-                            terraform init
                             terraform state show aws_s3_bucket.terraform_backend >/dev/null 2>&1 || terraform import aws_s3_bucket.terraform_backend buildmasters-tfstate-prod || true
                             terraform state show aws_dynamodb_table.terraform_lock >/dev/null 2>&1 || terraform import aws_dynamodb_table.terraform_lock monitoring-stack-dev-lock || true
                             terraform apply -auto-approve
@@ -92,7 +100,9 @@ pipeline {
                     usernamePassword(credentialsId: 'aws-enterprise-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     dir(env.TF_DIR) {
-                        sh 'terraform init'
+                        retry(3) {
+                            sh 'terraform init'
+                        }
                         sh "terraform plan -var-file=terraform.tfvars -var='environment=${params.ENVIRONMENT}' -out=tfplan"
                         sh 'terraform apply -auto-approve tfplan'
                     }
