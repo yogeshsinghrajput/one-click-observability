@@ -169,36 +169,6 @@ Jenkins Observability Pipeline
                 )
             }
         }
-        failure {
-            sendNotification(
-                status: 'FAILURE',
-                email: params.NOTIFICATION_EMAIL,
-                subject: "FAILURE: Deploy Observability Stack [Build #${env.BUILD_NUMBER}]",
-                body: """Dear Team,
+        
 
-We regret to inform you that the monitoring and observability stack deployment has failed during the Ansible host configuration stage.
 
-Please review the build execution logs to diagnose and resolve the issue:
-${env.BUILD_URL}
-
-Best Regards,
-Jenkins Observability Pipeline
-"""
-            )
-        }
-    }
-}
-
-void sendNotification(Map args) {
-    if (args.email && args.email.trim() != "") {
-        try {
-            mail to: args.email.trim(),
-                 subject: args.subject,
-                 body: args.body
-        } catch (Exception e) {
-            echo "WARNING: Failed to send email notification via SMTP: ${e.getMessage()}"
-        }
-    } else {
-        echo "Notification skipped: email parameter is empty"
-    }
-}
